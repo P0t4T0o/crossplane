@@ -309,6 +309,12 @@ func (c *GeneratedRevisionSpecConverter) v1EnvironmentPatchToV1beta1EnvironmentP
 func (c *GeneratedRevisionSpecConverter) v1EnvironmentSourceReferenceToV1beta1EnvironmentSourceReference(source EnvironmentSourceReference) v1beta1.EnvironmentSourceReference {
 	var v1beta1EnvironmentSourceReference v1beta1.EnvironmentSourceReference
 	v1beta1EnvironmentSourceReference.Name = source.Name
+	var pV1beta1Policy *v1beta1.Policy
+	if source.Policy != nil {
+		v1beta1Policy := c.v1PolicyToV1beta1Policy(*source.Policy)
+		pV1beta1Policy = &v1beta1Policy
+	}
+	v1beta1EnvironmentSourceReference.Policy = pV1beta1Policy
 	return v1beta1EnvironmentSourceReference
 }
 func (c *GeneratedRevisionSpecConverter) v1EnvironmentSourceSelectorLabelMatcherToV1beta1EnvironmentSourceSelectorLabelMatcher(source EnvironmentSourceSelectorLabelMatcher) v1beta1.EnvironmentSourceSelectorLabelMatcher {
@@ -336,6 +342,12 @@ func (c *GeneratedRevisionSpecConverter) v1EnvironmentSourceSelectorToV1beta1Env
 		v1beta1EnvironmentSourceSelectorLabelMatcherList[i] = c.v1EnvironmentSourceSelectorLabelMatcherToV1beta1EnvironmentSourceSelectorLabelMatcher(source.MatchLabels[i])
 	}
 	v1beta1EnvironmentSourceSelector.MatchLabels = v1beta1EnvironmentSourceSelectorLabelMatcherList
+	var pV1beta1Policy *v1beta1.Policy
+	if source.Policy != nil {
+		v1beta1Policy := c.v1PolicyToV1beta1Policy(*source.Policy)
+		pV1beta1Policy = &v1beta1Policy
+	}
+	v1beta1EnvironmentSourceSelector.Policy = pV1beta1Policy
 	return v1beta1EnvironmentSourceSelector
 }
 func (c *GeneratedRevisionSpecConverter) v1EnvironmentSourceToV1beta1EnvironmentSource(source EnvironmentSource) v1beta1.EnvironmentSource {
@@ -510,6 +522,16 @@ func (c *GeneratedRevisionSpecConverter) v1PatchToV1beta1Patch(source Patch) v1b
 	}
 	v1beta1Patch.Policy = pV1beta1PatchPolicy
 	return v1beta1Patch
+}
+func (c *GeneratedRevisionSpecConverter) v1PolicyToV1beta1Policy(source Policy) v1beta1.Policy {
+	var v1beta1Policy v1beta1.Policy
+	var pV1beta1ResolvePolicy *v1beta1.ResolvePolicy
+	if source.Resolve != nil {
+		v1beta1ResolvePolicy := v1beta1.ResolvePolicy(*source.Resolve)
+		pV1beta1ResolvePolicy = &v1beta1ResolvePolicy
+	}
+	v1beta1Policy.Resolve = pV1beta1ResolvePolicy
+	return v1beta1Policy
 }
 func (c *GeneratedRevisionSpecConverter) v1ReadinessCheckToV1beta1ReadinessCheck(source ReadinessCheck) v1beta1.ReadinessCheck {
 	var v1beta1ReadinessCheck v1beta1.ReadinessCheck
@@ -824,6 +846,12 @@ func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentPatchToV1EnvironmentP
 func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentSourceReferenceToV1EnvironmentSourceReference(source v1beta1.EnvironmentSourceReference) EnvironmentSourceReference {
 	var v1EnvironmentSourceReference EnvironmentSourceReference
 	v1EnvironmentSourceReference.Name = source.Name
+	var pV1Policy *Policy
+	if source.Policy != nil {
+		v1Policy := c.v1beta1PolicyToV1Policy(*source.Policy)
+		pV1Policy = &v1Policy
+	}
+	v1EnvironmentSourceReference.Policy = pV1Policy
 	return v1EnvironmentSourceReference
 }
 func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentSourceSelectorLabelMatcherToV1EnvironmentSourceSelectorLabelMatcher(source v1beta1.EnvironmentSourceSelectorLabelMatcher) EnvironmentSourceSelectorLabelMatcher {
@@ -851,6 +879,12 @@ func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentSourceSelectorToV1Env
 		v1EnvironmentSourceSelectorLabelMatcherList[i] = c.v1beta1EnvironmentSourceSelectorLabelMatcherToV1EnvironmentSourceSelectorLabelMatcher(source.MatchLabels[i])
 	}
 	v1EnvironmentSourceSelector.MatchLabels = v1EnvironmentSourceSelectorLabelMatcherList
+	var pV1Policy *Policy
+	if source.Policy != nil {
+		v1Policy := c.v1beta1PolicyToV1Policy(*source.Policy)
+		pV1Policy = &v1Policy
+	}
+	v1EnvironmentSourceSelector.Policy = pV1Policy
 	return v1EnvironmentSourceSelector
 }
 func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentSourceToV1EnvironmentSource(source v1beta1.EnvironmentSource) EnvironmentSource {
@@ -1000,6 +1034,16 @@ func (c *GeneratedRevisionSpecConverter) v1beta1PatchToV1Patch(source v1beta1.Pa
 	}
 	v1Patch.Policy = pV1PatchPolicy
 	return v1Patch
+}
+func (c *GeneratedRevisionSpecConverter) v1beta1PolicyToV1Policy(source v1beta1.Policy) Policy {
+	var v1Policy Policy
+	var pV1ResolvePolicy *ResolvePolicy
+	if source.Resolve != nil {
+		v1ResolvePolicy := ResolvePolicy(*source.Resolve)
+		pV1ResolvePolicy = &v1ResolvePolicy
+	}
+	v1Policy.Resolve = pV1ResolvePolicy
+	return v1Policy
 }
 func (c *GeneratedRevisionSpecConverter) v1beta1ReadinessCheckToV1ReadinessCheck(source v1beta1.ReadinessCheck) ReadinessCheck {
 	var v1ReadinessCheck ReadinessCheck

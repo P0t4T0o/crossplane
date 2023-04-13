@@ -61,11 +61,19 @@ type EnvironmentConfiguration struct {
 // EnvironmentSourceType specifies the way the EnvironmentConfig is selected.
 type EnvironmentSourceType string
 
+// ResolvePolicy is a type for resolve policy.
+type ResolvePolicy string
+
 const (
 	// EnvironmentSourceTypeReference by name.
 	EnvironmentSourceTypeReference EnvironmentSourceType = "Reference"
 	// EnvironmentSourceTypeSelector by labels.
 	EnvironmentSourceTypeSelector EnvironmentSourceType = "Selector"
+
+	// ResolvePolicyAlways is a resolve option.
+	// When the ResolvePolicy is set to ResolvePolicyAlways the reference will
+	// be tried to resolve for every reconcile loop.
+	ResolvePolicyAlways ResolvePolicy = "Always"
 )
 
 // EnvironmentSource selects a EnvironmentConfig resource.
@@ -91,12 +99,31 @@ type EnvironmentSource struct {
 type EnvironmentSourceReference struct {
 	// The name of the object.
 	Name string `json:"name"`
+
+	// Policies for referencing.
+	// +optional
+	Policy *Policy `json:"policy,omitempty"`
 }
 
 // An EnvironmentSourceSelector selects an EnvironmentConfig via labels.
 type EnvironmentSourceSelector struct {
 	// MatchLabels ensures an object with matching labels is selected.
 	MatchLabels []EnvironmentSourceSelectorLabelMatcher `json:"matchLabels,omitempty"`
+
+	// Policies for referencing.
+	// +optional
+	Policy *Policy `json:"policy,omitempty"`
+}
+
+// Policy represents policies of EnvironmentSourceReference instance.
+type Policy struct {
+	// Resolve specifies when this reference should be resolved. The default
+	// is 'IfNotPresent', which will attempt to resolve the reference only when
+	// the corresponding field is not present. Use 'Always' to resolve the
+	// reference on every reconcile.
+	// +optional
+	// +kubebuilder:validation:Enum=Always;IfNotPresent
+	Resolve *ResolvePolicy `json:"resolve,omitempty"`
 }
 
 // EnvironmentSourceSelectorLabelMatcherType specifies where the value for a

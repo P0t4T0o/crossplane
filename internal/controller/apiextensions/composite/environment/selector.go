@@ -68,36 +68,61 @@ type APIEnvironmentSelector struct {
 	kube client.Client
 }
 
+func isNoOp(ec *v1.EnvironmentConfiguration, currentRefs []corev1.ObjectReference) bool {
+
+	if ec == nil || len(ec.EnvironmentConfigs) == 0 {
+		return true
+	}
+
+	if len(currentRefs) == 0 {
+		return false
+	}
+
+	isAlways := false
+	for _, c := range ec.EnvironmentConfigs {
+		if c.Selector != nil {
+			if c.Selector.Policy.IsResolvePolicyAlways() {
+				isAlways = true
+				break
+			}
+			continue
+		}
+		if c.Ref != nil {
+			if c.Ref.Policy.IsResolvePolicyAlways() {
+				isAlways = true
+				break
+			}
+		}
+	}
+	return !isAlways
+}
+
 // SelectEnvironment for cr using the configuration defined in comp.
 // The computed list of EnvironmentConfig references will be stored in cr.
 func (s *APIEnvironmentSelector) SelectEnvironment(ctx context.Context, cr resource.Composite, comp *v1.Composition) error {
-	// noop if EnvironmentConfig references are already computed
-	if len(cr.GetEnvironmentConfigReferences()) > 0 {
-		return nil
-	}
-	if comp.Spec.Environment == nil || comp.Spec.Environment.EnvironmentConfigs == nil {
+
+	if isNoOp(comp.Spec.Environment, cr.GetEnvironmentConfigReferences()) {
 		return nil
 	}
 
 	refs := make([]corev1.ObjectReference, len(comp.Spec.Environment.EnvironmentConfigs))
 	idx := 0
-	for i, src := range comp.Spec.Environment.EnvironmentConfigs {
-		switch src.Type {
-		case v1.EnvironmentSourceTypeReference:
-			refs = append(
-				refs[:idx],
-				s.buildEnvironmentConfigRefFromRef(src.Ref),
-			)
+	for i, envSrc := range comp.Spec.Environment.EnvironmentConfigs {
+
+		if envSrc.Ref != nil {
+			refs = append(refs[:idx], s.buildEnvironmentConfigRefFromRef(envSrc.Ref))
 			idx++
-		case v1.EnvironmentSourceTypeSelector:
-			r, err := s.buildEnvironmentConfigRefFromSelector(ctx, cr, src.Selector)
+			continue
+		}
+
+		if envSrc.Selector != nil {
+			r, err := s.buildEnvironmentConfigRefFromSelector(ctx, cr, envSrc.Selector)
 			if err != nil {
 				return errors.Wrapf(err, errFmtReferenceEnvironmentConfig, i)
 			}
+
 			refs = append(refs[:idx], r...)
 			idx += len(r)
-		default:
-			return errors.Errorf(errFmtInvalidEnvironmentSourceType, string(src.Type))
 		}
 	}
 	cr.SetEnvironmentConfigReferences(refs)
@@ -126,7 +151,7 @@ func (s *APIEnvironmentSelector) buildEnvironmentConfigRefFromSelector(ctx conte
 		return []corev1.ObjectReference{}, errors.Wrap(err, errListEnvironmentConfigs)
 	}
 	if len(res.Items) == 0 {
-		return []corev1.ObjectReference{}, errors.New(errListEnvironmentConfigsNoResult)
+		return []corev1.ObjectReference{}, nil
 	}
 
 	envConfigs := make([]corev1.ObjectReference, len(res.Items))
