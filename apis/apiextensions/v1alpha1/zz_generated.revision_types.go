@@ -58,6 +58,10 @@ type EnvironmentConfiguration struct {
 	// Patches is a list of environment patches that are executed before a
 	// composition's resources are composed.
 	Patches []EnvironmentPatch `json:"patches,omitempty"`
+
+	// Policies for referencing.
+	// +optional
+	Policy *Policy `json:"policy,omitempty"`
 }
 
 // EnvironmentSourceType specifies the way the EnvironmentConfig is selected.
@@ -101,20 +105,12 @@ type EnvironmentSource struct {
 type EnvironmentSourceReference struct {
 	// The name of the object.
 	Name string `json:"name"`
-
-	// Policies for referencing.
-	// +optional
-	Policy *Policy `json:"policy,omitempty"`
 }
 
 // An EnvironmentSourceSelector selects an EnvironmentConfig via labels.
 type EnvironmentSourceSelector struct {
 	// MatchLabels ensures an object with matching labels is selected.
 	MatchLabels []EnvironmentSourceSelectorLabelMatcher `json:"matchLabels,omitempty"`
-
-	// Policies for referencing.
-	// +optional
-	Policy *Policy `json:"policy,omitempty"`
 }
 
 // Policy represents policies of EnvironmentSourceReference instance.

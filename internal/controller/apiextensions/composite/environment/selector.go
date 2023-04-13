@@ -78,23 +78,8 @@ func isNoOp(ec *v1.EnvironmentConfiguration, currentRefs []corev1.ObjectReferenc
 		return false
 	}
 
-	isAlways := false
-	for _, c := range ec.EnvironmentConfigs {
-		if c.Selector != nil {
-			if c.Selector.Policy.IsResolvePolicyAlways() {
-				isAlways = true
-				break
-			}
-			continue
-		}
-		if c.Ref != nil {
-			if c.Ref.Policy.IsResolvePolicyAlways() {
-				isAlways = true
-				break
-			}
-		}
-	}
-	return !isAlways
+	// currentRefs is non-empty list -> trigger update only if policy.resolve is Always
+	return !ec.Policy.IsResolvePolicyAlways()
 }
 
 // SelectEnvironment for cr using the configuration defined in comp.

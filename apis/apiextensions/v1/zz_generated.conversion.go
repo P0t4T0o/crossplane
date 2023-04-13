@@ -270,6 +270,12 @@ func (c *GeneratedRevisionSpecConverter) v1EnvironmentConfigurationToV1beta1Envi
 		v1beta1EnvironmentPatchList[j] = c.v1EnvironmentPatchToV1beta1EnvironmentPatch(source.Patches[j])
 	}
 	v1beta1EnvironmentConfiguration.Patches = v1beta1EnvironmentPatchList
+	var pV1beta1Policy *v1beta1.Policy
+	if source.Policy != nil {
+		v1beta1Policy := c.v1PolicyToV1beta1Policy(*source.Policy)
+		pV1beta1Policy = &v1beta1Policy
+	}
+	v1beta1EnvironmentConfiguration.Policy = pV1beta1Policy
 	return v1beta1EnvironmentConfiguration
 }
 func (c *GeneratedRevisionSpecConverter) v1EnvironmentPatchToV1beta1EnvironmentPatch(source EnvironmentPatch) v1beta1.EnvironmentPatch {
@@ -309,12 +315,6 @@ func (c *GeneratedRevisionSpecConverter) v1EnvironmentPatchToV1beta1EnvironmentP
 func (c *GeneratedRevisionSpecConverter) v1EnvironmentSourceReferenceToV1beta1EnvironmentSourceReference(source EnvironmentSourceReference) v1beta1.EnvironmentSourceReference {
 	var v1beta1EnvironmentSourceReference v1beta1.EnvironmentSourceReference
 	v1beta1EnvironmentSourceReference.Name = source.Name
-	var pV1beta1Policy *v1beta1.Policy
-	if source.Policy != nil {
-		v1beta1Policy := c.v1PolicyToV1beta1Policy(*source.Policy)
-		pV1beta1Policy = &v1beta1Policy
-	}
-	v1beta1EnvironmentSourceReference.Policy = pV1beta1Policy
 	return v1beta1EnvironmentSourceReference
 }
 func (c *GeneratedRevisionSpecConverter) v1EnvironmentSourceSelectorLabelMatcherToV1beta1EnvironmentSourceSelectorLabelMatcher(source EnvironmentSourceSelectorLabelMatcher) v1beta1.EnvironmentSourceSelectorLabelMatcher {
@@ -342,12 +342,6 @@ func (c *GeneratedRevisionSpecConverter) v1EnvironmentSourceSelectorToV1beta1Env
 		v1beta1EnvironmentSourceSelectorLabelMatcherList[i] = c.v1EnvironmentSourceSelectorLabelMatcherToV1beta1EnvironmentSourceSelectorLabelMatcher(source.MatchLabels[i])
 	}
 	v1beta1EnvironmentSourceSelector.MatchLabels = v1beta1EnvironmentSourceSelectorLabelMatcherList
-	var pV1beta1Policy *v1beta1.Policy
-	if source.Policy != nil {
-		v1beta1Policy := c.v1PolicyToV1beta1Policy(*source.Policy)
-		pV1beta1Policy = &v1beta1Policy
-	}
-	v1beta1EnvironmentSourceSelector.Policy = pV1beta1Policy
 	return v1beta1EnvironmentSourceSelector
 }
 func (c *GeneratedRevisionSpecConverter) v1EnvironmentSourceToV1beta1EnvironmentSource(source EnvironmentSource) v1beta1.EnvironmentSource {
@@ -807,6 +801,12 @@ func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentConfigurationToV1Envi
 		v1EnvironmentPatchList[j] = c.v1beta1EnvironmentPatchToV1EnvironmentPatch(source.Patches[j])
 	}
 	v1EnvironmentConfiguration.Patches = v1EnvironmentPatchList
+	var pV1Policy *Policy
+	if source.Policy != nil {
+		v1Policy := c.v1beta1PolicyToV1Policy(*source.Policy)
+		pV1Policy = &v1Policy
+	}
+	v1EnvironmentConfiguration.Policy = pV1Policy
 	return v1EnvironmentConfiguration
 }
 func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentPatchToV1EnvironmentPatch(source v1beta1.EnvironmentPatch) EnvironmentPatch {
@@ -846,12 +846,6 @@ func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentPatchToV1EnvironmentP
 func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentSourceReferenceToV1EnvironmentSourceReference(source v1beta1.EnvironmentSourceReference) EnvironmentSourceReference {
 	var v1EnvironmentSourceReference EnvironmentSourceReference
 	v1EnvironmentSourceReference.Name = source.Name
-	var pV1Policy *Policy
-	if source.Policy != nil {
-		v1Policy := c.v1beta1PolicyToV1Policy(*source.Policy)
-		pV1Policy = &v1Policy
-	}
-	v1EnvironmentSourceReference.Policy = pV1Policy
 	return v1EnvironmentSourceReference
 }
 func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentSourceSelectorLabelMatcherToV1EnvironmentSourceSelectorLabelMatcher(source v1beta1.EnvironmentSourceSelectorLabelMatcher) EnvironmentSourceSelectorLabelMatcher {
@@ -879,12 +873,6 @@ func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentSourceSelectorToV1Env
 		v1EnvironmentSourceSelectorLabelMatcherList[i] = c.v1beta1EnvironmentSourceSelectorLabelMatcherToV1EnvironmentSourceSelectorLabelMatcher(source.MatchLabels[i])
 	}
 	v1EnvironmentSourceSelector.MatchLabels = v1EnvironmentSourceSelectorLabelMatcherList
-	var pV1Policy *Policy
-	if source.Policy != nil {
-		v1Policy := c.v1beta1PolicyToV1Policy(*source.Policy)
-		pV1Policy = &v1Policy
-	}
-	v1EnvironmentSourceSelector.Policy = pV1Policy
 	return v1EnvironmentSourceSelector
 }
 func (c *GeneratedRevisionSpecConverter) v1beta1EnvironmentSourceToV1EnvironmentSource(source v1beta1.EnvironmentSource) EnvironmentSource {
