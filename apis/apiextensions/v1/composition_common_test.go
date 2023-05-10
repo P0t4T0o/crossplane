@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-func TestReadinessCheck_Validate(t *testing.T) {
+func TestReadinessCheckValidate(t *testing.T) {
 	type args struct {
 		r *ReadinessCheck
 	}

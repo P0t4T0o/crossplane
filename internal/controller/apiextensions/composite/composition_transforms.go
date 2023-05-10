@@ -26,9 +26,11 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/pointer"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
@@ -37,8 +39,8 @@ import (
 )
 
 const (
-	errMathNoMultiplier   = "no input is given"
-	errMathInputNonNumber = "input is required to be a number for math transformer"
+	errMathTransformTypeFailed = "type %s is not supported for math transform type"
+	errMathInputNonNumber      = "input is required to be a number for math transformer"
 
 	errFmtRequiredField                 = "%s is required by type %s"
 	errFmtConvertInputTypeNotSupported  = "invalid input type %T"
@@ -54,6 +56,7 @@ const (
 	errFmtMatchPattern            = "cannot match pattern at index %d"
 	errFmtMatchParseResult        = "cannot parse result of pattern at index %d"
 	errMatchParseFallbackValue    = "cannot parse fallback value"
+	errMatchFallbackBoth          = "cannot set both a fallback value and the fallback to input flag"
 	errFmtMatchPatternTypeInvalid = "unsupported pattern type '%s'"
 	errFmtMatchInputTypeInvalid   = "unsupported input type '%s'"
 	errMatchRegexpCompile         = "cannot compile regexp"
@@ -112,18 +115,44 @@ func Resolve(t v1.Transform, input any) (any, error) { //nolint:gocyclo // This 
 
 // ResolveMath resolves a Math transform.
 func ResolveMath(t v1.MathTransform, input any) (any, error) {
-	// Currently we support only multiply.
-	if t.Multiply == nil {
-		return nil, errors.New(errMathNoMultiplier)
-	}
+	inputInt := int64(0)
 	switch i := input.(type) {
 	case int64:
-		return *t.Multiply * i, nil
+		inputInt = i
 	case int:
-		return *t.Multiply * int64(i), nil
+		inputInt = int64(i)
 	default:
 		return nil, errors.New(errMathInputNonNumber)
 	}
+
+	if err := t.Validate(); err != nil {
+		return nil, err
+	}
+	switch t.GetType() {
+	case v1.MathTransformTypeMultiply:
+		return inputInt * *t.Multiply, nil
+	case v1.MathTransformTypeClampMax:
+		return mathClampMax(inputInt, *t.ClampMax), nil
+	case v1.MathTransformTypeClampMin:
+		return mathClampMin(inputInt, *t.ClampMin), nil
+	default:
+		return nil, errors.Errorf(errMathTransformTypeFailed, string(t.Type))
+
+	}
+}
+
+func mathClampMin(input int64, min int64) int64 {
+	if input < min {
+		return min
+	}
+	return input
+}
+
+func mathClampMax(input int64, max int64) int64 {
+	if input > max {
+		return max
+	}
+	return input
 }
 
 // ResolveMap resolves a Map transform.
@@ -159,6 +188,16 @@ func ResolveMatch(t v1.MatchTransform, input any) (any, error) {
 			return output, nil
 		}
 	}
+
+	// Fallback to input if no pattern matches and fallback to input is set
+	if t.FallbackTo == v1.MatchFallbackToTypeInput {
+		if t.FallbackValue.Size() != 0 {
+			return nil, errors.New(errMatchFallbackBoth)
+		}
+
+		return input, nil
+	}
+
 	// Use fallback value if no pattern matches (or if there are no patterns)
 	if err := unmarshalJSON(t.FallbackValue, &output); err != nil {
 		return nil, errors.Wrap(err, errMatchParseFallbackValue)
@@ -320,9 +359,97 @@ func ResolveConvert(t v1.ConvertTransform, input any) (any, error) {
 	if !from.IsValid() {
 		return nil, errors.Errorf(errFmtConvertInputTypeNotSupported, input)
 	}
-	f, err := t.GetConversionFunc(from)
+	f, err := GetConversionFunc(&t, from)
 	if err != nil {
 		return nil, err
 	}
 	return f(input)
+}
+
+type conversionPair struct {
+	from   v1.TransformIOType
+	to     v1.TransformIOType
+	format v1.ConvertTransformFormat
+}
+
+// GetConversionFunc returns the conversion function for the given input and output types, or an error if no conversion is
+// supported. Will return a no-op conversion if the input and output types are the same.
+func GetConversionFunc(t *v1.ConvertTransform, from v1.TransformIOType) (func(any) (any, error), error) {
+	originalFrom := from
+	to := t.ToType
+	if to == v1.TransformIOTypeInt {
+		to = v1.TransformIOTypeInt64
+	}
+	if from == v1.TransformIOTypeInt {
+		from = v1.TransformIOTypeInt64
+	}
+	if to == from {
+		return func(input any) (any, error) {
+			return input, nil
+		}, nil
+	}
+	f, ok := conversions[conversionPair{from: from, to: to, format: t.GetFormat()}]
+	if !ok {
+		return nil, errors.Errorf(v1.ErrFmtConvertFormatPairNotSupported, originalFrom, to, t.GetFormat())
+	}
+	return f, nil
+}
+
+// The unparam linter is complaining that these functions always return a nil
+// error, but we need this to be the case given some other functions in the map
+// may return an error.
+var conversions = map[conversionPair]func(any) (any, error){
+	{from: v1.TransformIOTypeString, to: v1.TransformIOTypeInt64, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) {
+
+		return strconv.ParseInt(i.(string), 10, 64)
+	},
+	{from: v1.TransformIOTypeString, to: v1.TransformIOTypeBool, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) {
+		return strconv.ParseBool(i.(string))
+	},
+	{from: v1.TransformIOTypeString, to: v1.TransformIOTypeFloat64, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) {
+		return strconv.ParseFloat(i.(string), 64)
+	},
+	{from: v1.TransformIOTypeString, to: v1.TransformIOTypeFloat64, format: v1.ConvertTransformFormatQuantity}: func(i any) (any, error) {
+		q, err := resource.ParseQuantity(i.(string))
+		if err != nil {
+			return nil, err
+		}
+		return q.AsApproximateFloat64(), nil
+	},
+
+	{from: v1.TransformIOTypeInt64, to: v1.TransformIOTypeString, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
+		return strconv.FormatInt(i.(int64), 10), nil
+	},
+	{from: v1.TransformIOTypeInt64, to: v1.TransformIOTypeBool, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
+		return i.(int64) == 1, nil
+	},
+	{from: v1.TransformIOTypeInt64, to: v1.TransformIOTypeFloat64, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
+		return float64(i.(int64)), nil
+	},
+
+	{from: v1.TransformIOTypeBool, to: v1.TransformIOTypeString, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
+		return strconv.FormatBool(i.(bool)), nil
+	},
+	{from: v1.TransformIOTypeBool, to: v1.TransformIOTypeInt64, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
+		if i.(bool) {
+			return int64(1), nil
+		}
+		return int64(0), nil
+	},
+	{from: v1.TransformIOTypeBool, to: v1.TransformIOTypeFloat64, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
+		if i.(bool) {
+			return float64(1), nil
+		}
+		return float64(0), nil
+	},
+
+	{from: v1.TransformIOTypeFloat64, to: v1.TransformIOTypeString, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
+		return strconv.FormatFloat(i.(float64), 'f', -1, 64), nil
+	},
+	{from: v1.TransformIOTypeFloat64, to: v1.TransformIOTypeInt64, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
+		return int64(i.(float64)), nil
+	},
+	{from: v1.TransformIOTypeFloat64, to: v1.TransformIOTypeBool, format: v1.ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
+		return i.(float64) == float64(1), nil
+	},
 }

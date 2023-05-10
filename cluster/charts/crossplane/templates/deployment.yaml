@@ -43,8 +43,9 @@ spec:
       priorityClassName: {{ .Values.priorityClassName  | quote }}
       {{- end }}
       serviceAccountName: {{ template "crossplane.name" . }}
+      hostNetwork: {{ .Values.hostNetwork }}
       initContainers:
-        - image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        - image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default (printf "v%s" .Chart.AppVersion) }}"
           args:
           - core
           - init
@@ -100,7 +101,7 @@ spec:
             value: ess-server-certs
           {{- end }}
       containers:
-      - image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default (printf "v%s" .Chart.AppVersion) }}"
         args:
         - core
         - start
@@ -139,6 +140,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+          - name: POD_SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName
           - name: LEADER_ELECTION
             value: "{{ .Values.leaderElection }}"
           {{- if .Values.registryCaBundleConfig.key }}
@@ -180,7 +185,7 @@ spec:
           {{- toYaml .Values.extraVolumeMountsCrossplane | nindent 10 }}
           {{- end }}
       {{- if .Values.xfn.enabled }}
-      - image: {{ .Values.xfn.image.repository }}:{{ .Values.xfn.image.tag }}
+      - image: "{{ .Values.xfn.image.repository }}:{{ .Values.xfn.image.tag | default (printf "v%s" .Chart.AppVersion) }}"
         args:
         - start
         {{- range $arg := .Values.xfn.args }}

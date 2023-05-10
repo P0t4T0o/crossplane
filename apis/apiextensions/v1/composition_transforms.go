@@ -19,15 +19,13 @@ package v1
 import (
 	"encoding/json"
 	"regexp"
-	"strconv"
 
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/crossplane/crossplane-runtime/pkg/errors"
 
-	xperrors "github.com/crossplane/crossplane/pkg/validation/errors"
+	verrors "github.com/crossplane/crossplane/internal/validation/errors"
 )
 
 // TransformType is type of the transform function to be chosen.
@@ -84,28 +82,28 @@ func (t *Transform) Validate() *field.Error {
 		if t.Math == nil {
 			return field.Required(field.NewPath("math"), "given transform type math requires configuration")
 		}
-		return xperrors.WrapFieldError(t.Math.Validate(), field.NewPath("math"))
+		return verrors.WrapFieldError(t.Math.Validate(), field.NewPath("math"))
 	case TransformTypeMap:
 		if t.Map == nil {
 			return field.Required(field.NewPath("map"), "given transform type map requires configuration")
 		}
-		return xperrors.WrapFieldError(t.Map.Validate(), field.NewPath("map"))
+		return verrors.WrapFieldError(t.Map.Validate(), field.NewPath("map"))
 	case TransformTypeMatch:
 		if t.Match == nil {
 			return field.Required(field.NewPath("match"), "given transform type match requires configuration")
 		}
-		return xperrors.WrapFieldError(t.Match.Validate(), field.NewPath("match"))
+		return verrors.WrapFieldError(t.Match.Validate(), field.NewPath("match"))
 	case TransformTypeString:
 		if t.String == nil {
 			return field.Required(field.NewPath("string"), "given transform type string requires configuration")
 		}
-		return xperrors.WrapFieldError(t.String.Validate(), field.NewPath("string"))
+		return verrors.WrapFieldError(t.String.Validate(), field.NewPath("string"))
 	case TransformTypeConvert:
 		if t.Convert == nil {
 			return field.Required(field.NewPath("convert"), "given transform type convert requires configuration")
 		}
 		if err := t.Convert.Validate(); err != nil {
-			return xperrors.WrapFieldError(err, field.NewPath("convert"))
+			return verrors.WrapFieldError(err, field.NewPath("convert"))
 		}
 	default:
 		// Should never happen
@@ -113,94 +111,6 @@ func (t *Transform) Validate() *field.Error {
 	}
 
 	return nil
-}
-
-type conversionPair struct {
-	from   TransformIOType
-	to     TransformIOType
-	format ConvertTransformFormat
-}
-
-// GetConversionFunc returns the conversion function for the given input and output types, or an error if no conversion is
-// supported. Will return a no-op conversion if the input and output types are the same.
-func (t *ConvertTransform) GetConversionFunc(from TransformIOType) (func(any) (any, error), error) {
-	originalFrom := from
-	to := t.ToType
-	if to == TransformIOTypeInt {
-		to = TransformIOTypeInt64
-	}
-	if from == TransformIOTypeInt {
-		from = TransformIOTypeInt64
-	}
-	if to == from {
-		return func(input any) (any, error) {
-			return input, nil
-		}, nil
-	}
-	f, ok := conversions[conversionPair{from: from, to: to, format: t.GetFormat()}]
-	if !ok {
-		return nil, errors.Errorf(ErrFmtConvertFormatPairNotSupported, originalFrom, to, t.GetFormat())
-	}
-	return f, nil
-}
-
-// The unparam linter is complaining that these functions always return a nil
-// error, but we need this to be the case given some other functions in the map
-// may return an error.
-var conversions = map[conversionPair]func(any) (any, error){
-	{from: TransformIOTypeString, to: TransformIOTypeInt64, format: ConvertTransformFormatNone}: func(i any) (any, error) {
-
-		return strconv.ParseInt(i.(string), 10, 64)
-	},
-	{from: TransformIOTypeString, to: TransformIOTypeBool, format: ConvertTransformFormatNone}: func(i any) (any, error) {
-		return strconv.ParseBool(i.(string))
-	},
-	{from: TransformIOTypeString, to: TransformIOTypeFloat64, format: ConvertTransformFormatNone}: func(i any) (any, error) {
-		return strconv.ParseFloat(i.(string), 64)
-	},
-	{from: TransformIOTypeString, to: TransformIOTypeFloat64, format: ConvertTransformFormatQuantity}: func(i any) (any, error) {
-		q, err := resource.ParseQuantity(i.(string))
-		if err != nil {
-			return nil, err
-		}
-		return q.AsApproximateFloat64(), nil
-	},
-
-	{from: TransformIOTypeInt64, to: TransformIOTypeString, format: ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
-		return strconv.FormatInt(i.(int64), 10), nil
-	},
-	{from: TransformIOTypeInt64, to: TransformIOTypeBool, format: ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
-		return i.(int64) == 1, nil
-	},
-	{from: TransformIOTypeInt64, to: TransformIOTypeFloat64, format: ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
-		return float64(i.(int64)), nil
-	},
-
-	{from: TransformIOTypeBool, to: TransformIOTypeString, format: ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
-		return strconv.FormatBool(i.(bool)), nil
-	},
-	{from: TransformIOTypeBool, to: TransformIOTypeInt64, format: ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
-		if i.(bool) {
-			return int64(1), nil
-		}
-		return int64(0), nil
-	},
-	{from: TransformIOTypeBool, to: TransformIOTypeFloat64, format: ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
-		if i.(bool) {
-			return float64(1), nil
-		}
-		return float64(0), nil
-	},
-
-	{from: TransformIOTypeFloat64, to: TransformIOTypeString, format: ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
-		return strconv.FormatFloat(i.(float64), 'f', -1, 64), nil
-	},
-	{from: TransformIOTypeFloat64, to: TransformIOTypeInt64, format: ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
-		return int64(i.(float64)), nil
-	},
-	{from: TransformIOTypeFloat64, to: TransformIOTypeBool, format: ConvertTransformFormatNone}: func(i any) (any, error) { //nolint:unparam // See note above.
-		return i.(float64) == float64(1), nil
-	},
 }
 
 // GetFormat returns the format of the transform.
@@ -231,18 +141,61 @@ func (t *Transform) GetOutputType() (*TransformIOType, error) {
 	return &out, nil
 }
 
+// MathTransformType conducts mathematical operations.
+type MathTransformType string
+
+// Accepted MathTransformType.
+const (
+	MathTransformTypeMultiply MathTransformType = "Multiply" // Default
+	MathTransformTypeClampMin MathTransformType = "ClampMin"
+	MathTransformTypeClampMax MathTransformType = "ClampMax"
+)
+
 // MathTransform conducts mathematical operations on the input with the given
 // configuration in its properties.
 type MathTransform struct {
+	// Type of the math transform to be run.
+	// +optional
+	// +kubebuilder:validation:Enum=Multiply;ClampMin;ClampMax
+	// +kubebuilder:default=Multiply
+	Type MathTransformType `json:"type,omitempty"`
+
 	// Multiply the value.
 	// +optional
 	Multiply *int64 `json:"multiply,omitempty"`
+	// ClampMin makes sure that the value is not smaller than the given value.
+	// +optional
+	ClampMin *int64 `json:"clampMin,omitempty"`
+	// ClampMax makes sure that the value is not bigger than the given value.
+	// +optional
+	ClampMax *int64 `json:"clampMax,omitempty"`
+}
+
+// GetType returns the type of the math transform, returning the default if not specified.
+func (m *MathTransform) GetType() MathTransformType {
+	if m.Type == "" {
+		return MathTransformTypeMultiply
+	}
+	return m.Type
 }
 
 // Validate checks this MathTransform is valid.
 func (m *MathTransform) Validate() *field.Error {
-	if m.Multiply == nil {
-		return field.Required(field.NewPath("multiply"), "at least one operation must be specified if a math transform is specified")
+	switch m.GetType() {
+	case MathTransformTypeMultiply:
+		if m.Multiply == nil {
+			return field.Required(field.NewPath("multiply"), "must specify a value if a multiply math transform is specified")
+		}
+	case MathTransformTypeClampMin:
+		if m.ClampMin == nil {
+			return field.Required(field.NewPath("clampMin"), "must specify a value if a clamp min math transform is specified")
+		}
+	case MathTransformTypeClampMax:
+		if m.ClampMax == nil {
+			return field.Required(field.NewPath("clampMax"), "must specify a value if a clamp max math transform is specified")
+		}
+	default:
+		return field.Invalid(field.NewPath("type"), m.Type, "unknown math transform type")
 	}
 	return nil
 }
@@ -279,6 +232,15 @@ func (m *MapTransform) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m.Pairs)
 }
 
+// MatchFallbackTo defines how a match operation will fallback.
+type MatchFallbackTo string
+
+// Valid MatchFallbackTo.
+const (
+	MatchFallbackToTypeValue MatchFallbackTo = "Value"
+	MatchFallbackToTypeInput MatchFallbackTo = "Input"
+)
+
 // MatchTransform is a more complex version of a map transform that matches a
 // list of patterns.
 type MatchTransform struct {
@@ -290,6 +252,11 @@ type MatchTransform struct {
 	// The fallback value that should be returned by the transform if now pattern
 	// matches.
 	FallbackValue extv1.JSON `json:"fallbackValue,omitempty"`
+	// Determines to what value the transform should fallback if no pattern matches.
+	// +optional
+	// +kubebuilder:validation:Enum=Value;Input
+	// +kubebuilder:default=Value
+	FallbackTo MatchFallbackTo `json:"fallbackTo,omitempty"`
 }
 
 // Validate checks this MatchTransform is valid.
@@ -299,7 +266,7 @@ func (m *MatchTransform) Validate() *field.Error {
 	}
 	for i, p := range m.Patterns {
 		if err := p.Validate(); err != nil {
-			return xperrors.WrapFieldError(err, field.NewPath("patterns").Index(i))
+			return verrors.WrapFieldError(err, field.NewPath("patterns").Index(i))
 		}
 	}
 	return nil

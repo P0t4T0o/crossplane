@@ -849,8 +849,8 @@ func TestPatchAndTransform(t *testing.T) {
 			reason: "We should return any error encountered while inlining a Composition's PatchSets.",
 			args: args{
 				req: CompositionRequest{
-					Composition: &v1.Composition{
-						Spec: v1.CompositionSpec{
+					Revision: &v1.CompositionRevision{
+						Spec: v1.CompositionRevisionSpec{
 							Resources: []v1.ComposedTemplate{{
 								Patches: []v1.Patch{{
 									// This reference to a non-existent patchset
@@ -877,8 +877,8 @@ func TestPatchAndTransform(t *testing.T) {
 			},
 			args: args{
 				req: CompositionRequest{
-					Composition: &v1.Composition{
-						Spec: v1.CompositionSpec{
+					Revision: &v1.CompositionRevision{
+						Spec: v1.CompositionRevisionSpec{
 							Resources: []v1.ComposedTemplate{
 								{
 									Name: pointer.String("cool-resource"),
@@ -932,8 +932,8 @@ func TestPatchAndTransform(t *testing.T) {
 			},
 			args: args{
 				req: CompositionRequest{
-					Composition: &v1.Composition{
-						Spec: v1.CompositionSpec{
+					Revision: &v1.CompositionRevision{
+						Spec: v1.CompositionRevisionSpec{
 							Resources: []v1.ComposedTemplate{
 								{
 									Name: pointer.String("cool-resource"),
@@ -1141,8 +1141,8 @@ func TestRunFunctionPipeline(t *testing.T) {
 			reason: "We should return an error if asked to run an unsupported function type.",
 			args: args{
 				req: CompositionRequest{
-					Composition: &v1.Composition{
-						Spec: v1.CompositionSpec{
+					Revision: &v1.CompositionRevision{
+						Spec: v1.CompositionRevisionSpec{
 							Functions: []v1.Function{
 								{
 									Name: "cool-fn",
@@ -1166,8 +1166,8 @@ func TestRunFunctionPipeline(t *testing.T) {
 			},
 			args: args{
 				req: CompositionRequest{
-					Composition: &v1.Composition{
-						Spec: v1.CompositionSpec{
+					Revision: &v1.CompositionRevision{
+						Spec: v1.CompositionRevisionSpec{
 							Functions: []v1.Function{
 								{
 									Name: "cool-fn",
@@ -1198,8 +1198,8 @@ func TestRunFunctionPipeline(t *testing.T) {
 			},
 			args: args{
 				req: CompositionRequest{
-					Composition: &v1.Composition{
-						Spec: v1.CompositionSpec{
+					Revision: &v1.CompositionRevision{
+						Spec: v1.CompositionRevisionSpec{
 							Functions: []v1.Function{
 								{
 									Name: "cool-fn",
@@ -1232,8 +1232,8 @@ func TestRunFunctionPipeline(t *testing.T) {
 			},
 			args: args{
 				req: CompositionRequest{
-					Composition: &v1.Composition{
-						Spec: v1.CompositionSpec{
+					Revision: &v1.CompositionRevision{
+						Spec: v1.CompositionRevisionSpec{
 							Functions: []v1.Function{
 								{
 									Name: "cool-fn",
@@ -1274,8 +1274,8 @@ func TestRunFunctionPipeline(t *testing.T) {
 			},
 			args: args{
 				req: CompositionRequest{
-					Composition: &v1.Composition{
-						Spec: v1.CompositionSpec{
+					Revision: &v1.CompositionRevision{
+						Spec: v1.CompositionRevisionSpec{
 							Functions: []v1.Function{
 								{
 									Name: "cool-fn",
@@ -1341,8 +1341,8 @@ func TestRunFunctionPipeline(t *testing.T) {
 			},
 			args: args{
 				req: CompositionRequest{
-					Composition: &v1.Composition{
-						Spec: v1.CompositionSpec{
+					Revision: &v1.CompositionRevision{
+						Spec: v1.CompositionRevisionSpec{
 							Functions: []v1.Function{
 								{
 									Name: "cool-fn",
@@ -1510,7 +1510,9 @@ func TestRunFunction(t *testing.T) {
 				Endpoint: pointer.String(lis.Addr().String()),
 			}
 
-			fnio, err := RunFunction(tc.args.ctx, tc.args.fnio, tc.args.fn)
+			xfnRunner := &DefaultCompositeFunctionRunner{}
+
+			fnio, err := xfnRunner.RunFunction(tc.args.ctx, tc.args.fnio, tc.args.fn)
 
 			_ = lis.Close() // This should terminate the goroutine above.
 			wg.Wait()
@@ -1662,14 +1664,16 @@ func TestImagePullConfig(t *testing.T) {
 	ifNotPresent := corev1.PullIfNotPresent
 
 	cases := map[string]struct {
-		reason string
-		fn     *v1.ContainerFunction
-		want   *fnpbv1alpha1.ImagePullConfig
+		reason  string
+		fn      *v1.ContainerFunction
+		want    *fnpbv1alpha1.ImagePullConfig
+		wantErr error
 	}{
 		"NoImagePullPolicy": {
-			reason: "We should return an empty config if there's no ImagePullPolicy.",
-			fn:     &v1.ContainerFunction{},
-			want:   &fnpbv1alpha1.ImagePullConfig{},
+			reason:  "We should return an empty config if there's no ImagePullPolicy.",
+			fn:      &v1.ContainerFunction{},
+			want:    &fnpbv1alpha1.ImagePullConfig{},
+			wantErr: nil,
 		},
 		"PullAlways": {
 			reason: "We should correctly map PullAlways.",
@@ -1679,6 +1683,7 @@ func TestImagePullConfig(t *testing.T) {
 			want: &fnpbv1alpha1.ImagePullConfig{
 				PullPolicy: fnpbv1alpha1.ImagePullPolicy_IMAGE_PULL_POLICY_ALWAYS,
 			},
+			wantErr: nil,
 		},
 		"PullNever": {
 			reason: "We should correctly map PullNever.",
@@ -1688,6 +1693,7 @@ func TestImagePullConfig(t *testing.T) {
 			want: &fnpbv1alpha1.ImagePullConfig{
 				PullPolicy: fnpbv1alpha1.ImagePullPolicy_IMAGE_PULL_POLICY_NEVER,
 			},
+			wantErr: nil,
 		},
 		"PullIfNotPresent": {
 			reason: "We should correctly map PullIfNotPresent.",
@@ -1697,13 +1703,17 @@ func TestImagePullConfig(t *testing.T) {
 			want: &fnpbv1alpha1.ImagePullConfig{
 				PullPolicy: fnpbv1alpha1.ImagePullPolicy_IMAGE_PULL_POLICY_IF_NOT_PRESENT,
 			},
+			wantErr: nil,
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			got, err := ImagePullConfig(tc.fn, nil)
 
-			got := ImagePullConfig(tc.fn)
+			if diff := cmp.Diff(tc.wantErr, err, test.EquateErrors()); diff != "" {
+				t.Errorf("\n%s\nImagePullConfig(...): -want, +got:\n%s", tc.reason, diff)
+			}
 
 			if diff := cmp.Diff(tc.want, got, protocmp.Transform()); diff != "" {
 				t.Errorf("\n%s\nImagePullConfig(...): -want, +got:\n%s", tc.reason, diff)

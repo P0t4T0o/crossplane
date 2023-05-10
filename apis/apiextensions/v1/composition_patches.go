@@ -23,7 +23,7 @@ import (
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 
-	"github.com/crossplane/crossplane/pkg/validation/errors"
+	verrors "github.com/crossplane/crossplane/internal/validation/errors"
 )
 
 // A PatchType is a type of patch.
@@ -61,6 +61,14 @@ type PatchPolicy struct {
 	// +optional
 	FromFieldPath *FromFieldPathPolicy `json:"fromFieldPath,omitempty"`
 	MergeOptions  *xpv1.MergeOptions   `json:"mergeOptions,omitempty"`
+}
+
+// GetFromFieldPathPolicy returns the FromFieldPathPolicy for this PatchPolicy, defaulting to FromFieldPathPolicyOptional if not specified.
+func (pp *PatchPolicy) GetFromFieldPathPolicy() FromFieldPathPolicy {
+	if pp == nil || pp.FromFieldPath == nil {
+		return FromFieldPathPolicyOptional
+	}
+	return *pp.FromFieldPath
 }
 
 // Patch objects are applied between composite and composed resources. Their
@@ -106,6 +114,22 @@ type Patch struct {
 	Policy *PatchPolicy `json:"policy,omitempty"`
 }
 
+// GetFromFieldPath returns the FromFieldPath for this Patch, or an empty string if it is nil.
+func (p *Patch) GetFromFieldPath() string {
+	if p.FromFieldPath == nil {
+		return ""
+	}
+	return *p.FromFieldPath
+}
+
+// GetToFieldPath returns the ToFieldPath for this Patch, or an empty string if it is nil.
+func (p *Patch) GetToFieldPath() string {
+	if p.ToFieldPath == nil {
+		return ""
+	}
+	return *p.ToFieldPath
+}
+
 // GetType returns the patch type. If the type is not set, it returns the default type.
 func (p *Patch) GetType() PatchType {
 	if p.Type == "" {
@@ -138,7 +162,7 @@ func (p *Patch) Validate() *field.Error {
 	}
 	for i, transform := range p.Transforms {
 		if err := transform.Validate(); err != nil {
-			return errors.WrapFieldError(err, field.NewPath("transforms").Index(i))
+			return verrors.WrapFieldError(err, field.NewPath("transforms").Index(i))
 		}
 	}
 

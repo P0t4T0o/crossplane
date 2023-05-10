@@ -10,7 +10,7 @@
   "prConcurrentLimit": 5,
 // The branches renovate should target
 // PLEASE UPDATE THIS WHEN RELEASING.
-  "baseBranches": ["master","release-1.9","release-1.10","release-1.11"],
+  "baseBranches": ["master","release-1.10","release-1.11","release-1.12"],
   "ignorePaths": ["design/**"],
   "postUpdateOptions": ["gomodTidy"],
 // By default renovate will auto detect whether semantic commits have been used
@@ -152,13 +152,14 @@
       ],
       "groupName": "all non-major go dependencies"
     }, {
-// We want a single PR for all minor and patch bumps of Github Actions
+// We want a single PR for all non-major bumps of Github Actions
       "matchDepTypes": [
         "action"
       ],
       "matchUpdateTypes": [
         "minor",
-        "patch"
+        "patch",
+        "digest"
       ],
       "groupName": "all non-major github action",
       "pinDigests": true

@@ -52,7 +52,7 @@ func NewNoopEnvironmentSelector() *NoopEnvironmentSelector {
 type NoopEnvironmentSelector struct{}
 
 // SelectEnvironment always returns nil.
-func (s *NoopEnvironmentSelector) SelectEnvironment(_ context.Context, _ resource.Composite, _ *v1.Composition) error {
+func (s *NoopEnvironmentSelector) SelectEnvironment(_ context.Context, _ resource.Composite, _ *v1.CompositionRevision) error {
 	return nil
 }
 
@@ -84,7 +84,7 @@ func isNoOp(ec *v1.EnvironmentConfiguration, currentRefs []corev1.ObjectReferenc
 
 // SelectEnvironment for cr using the configuration defined in comp.
 // The computed list of EnvironmentConfig references will be stored in cr.
-func (s *APIEnvironmentSelector) SelectEnvironment(ctx context.Context, cr resource.Composite, comp *v1.Composition) error {
+func (s *APIEnvironmentSelector) SelectEnvironment(ctx context.Context, cr resource.Composite, comp *v1.CompositionRevision) error {
 
 	if isNoOp(comp.Spec.Environment, cr.GetEnvironmentConfigReferences()) {
 		return nil
@@ -92,22 +92,23 @@ func (s *APIEnvironmentSelector) SelectEnvironment(ctx context.Context, cr resou
 
 	refs := make([]corev1.ObjectReference, len(comp.Spec.Environment.EnvironmentConfigs))
 	idx := 0
-	for i, envSrc := range comp.Spec.Environment.EnvironmentConfigs {
-
-		if envSrc.Ref != nil {
-			refs = append(refs[:idx], s.buildEnvironmentConfigRefFromRef(envSrc.Ref))
+	for i, src := range comp.Spec.Environment.EnvironmentConfigs {
+		switch src.Type {
+		case v1.EnvironmentSourceTypeReference:
+			refs = append(
+				refs[:idx],
+				s.buildEnvironmentConfigRefFromRef(src.Ref),
+			)
 			idx++
-			continue
-		}
-
-		if envSrc.Selector != nil {
-			r, err := s.buildEnvironmentConfigRefFromSelector(ctx, cr, envSrc.Selector)
+		case v1.EnvironmentSourceTypeSelector:
+			r, err := s.buildEnvironmentConfigRefFromSelector(ctx, cr, src.Selector)
 			if err != nil {
 				return errors.Wrapf(err, errFmtReferenceEnvironmentConfig, i)
 			}
-
 			refs = append(refs[:idx], r...)
 			idx += len(r)
+		default:
+			return errors.Errorf(errFmtInvalidEnvironmentSourceType, string(src.Type))
 		}
 	}
 	cr.SetEnvironmentConfigReferences(refs)

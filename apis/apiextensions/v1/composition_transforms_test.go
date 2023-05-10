@@ -29,7 +29,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 )
 
-func TestTransform_Validate(t *testing.T) {
+func TestTransformValidate(t *testing.T) {
 	type args struct {
 		transform *Transform
 	}
@@ -42,8 +42,20 @@ func TestTransform_Validate(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"ValidMath": {
-			reason: "Math transform with MathTransform set should be valid",
+		"ValidMathMultiply": {
+			reason: "Math transform with MathTransform Multiply set should be valid",
+			args: args{
+				transform: &Transform{
+					Type: TransformTypeMath,
+					Math: &MathTransform{
+						Type:     MathTransformTypeMultiply,
+						Multiply: pointer.Int64(2),
+					},
+				},
+			},
+		},
+		"ValidMathDefaultType": {
+			reason: "Math transform with MathTransform Default set should be valid",
 			args: args{
 				transform: &Transform{
 					Type: TransformTypeMath,
@@ -53,7 +65,37 @@ func TestTransform_Validate(t *testing.T) {
 				},
 			},
 		},
-		"InvalidMath": {
+		"ValidMathClampMin": {
+			reason: "Math transform with valid MathTransform ClampMin set should be valid",
+			args: args{
+				transform: &Transform{
+					Type: TransformTypeMath,
+					Math: &MathTransform{
+						Type:     MathTransformTypeClampMin,
+						ClampMin: pointer.Int64(10),
+					},
+				},
+			},
+		},
+		"InvalidMathWrongSpec": {
+			reason: "Math transform with invalid MathTransform set should be invalid",
+			args: args{
+				transform: &Transform{
+					Type: TransformTypeMath,
+					Math: &MathTransform{
+						Type:     MathTransformTypeMultiply,
+						ClampMin: pointer.Int64(10),
+					},
+				},
+			},
+			want: want{
+				&field.Error{
+					Type:  field.ErrorTypeRequired,
+					Field: "math.multiply",
+				},
+			},
+		},
+		"InvalidMathNotDefinedAtAll": {
 			reason: "Math transform with no MathTransform set should be invalid",
 			args: args{
 				transform: &Transform{
@@ -296,108 +338,7 @@ func TestTransform_Validate(t *testing.T) {
 	}
 }
 
-func TestConvertTransform_GetConversionFunc(t *testing.T) {
-	type args struct {
-		ct   *ConvertTransform
-		from TransformIOType
-	}
-	type want struct {
-		err error
-	}
-	cases := map[string]struct {
-		reason string
-		args   args
-		want   want
-	}{
-		"IntToString": {
-			reason: "Int to String should be valid",
-			args: args{
-				ct: &ConvertTransform{
-					ToType: TransformIOTypeString,
-				},
-				from: TransformIOTypeInt,
-			},
-		},
-		"IntToInt": {
-			reason: "Int to Int should be valid",
-			args: args{
-				ct: &ConvertTransform{
-					ToType: TransformIOTypeInt,
-				},
-				from: TransformIOTypeInt,
-			},
-		},
-		"IntToInt64": {
-			reason: "Int to Int64 should be valid",
-			args: args{
-				ct: &ConvertTransform{
-					ToType: TransformIOTypeInt,
-				},
-				from: TransformIOTypeInt64,
-			},
-		},
-		"Int64ToInt": {
-			reason: "Int64 to Int should be valid",
-			args: args{
-				ct: &ConvertTransform{
-					ToType: TransformIOTypeInt64,
-				},
-				from: TransformIOTypeInt,
-			},
-		},
-		"IntToFloat": {
-			reason: "Int to Float should be valid",
-			args: args{
-				ct: &ConvertTransform{
-					ToType: TransformIOTypeInt,
-				},
-				from: TransformIOTypeFloat64,
-			},
-		},
-		"IntToBool": {
-			reason: "Int to Bool should be valid",
-			args: args{
-				ct: &ConvertTransform{
-					ToType: TransformIOTypeInt,
-				},
-				from: TransformIOTypeBool,
-			},
-		},
-		"StringToIntInvalidFormat": {
-			reason: "String to Int with invalid format should be invalid",
-			args: args{
-				ct: &ConvertTransform{
-					ToType: TransformIOTypeInt,
-					Format: &[]ConvertTransformFormat{"wrong"}[0],
-				},
-				from: TransformIOTypeString,
-			},
-			want: want{
-				err: fmt.Errorf("conversion from string to int64 is not supported with format wrong"),
-			},
-		},
-		"IntToIntInvalidFormat": {
-			reason: "Int to Int, invalid format ignored because it is the same type",
-			args: args{
-				ct: &ConvertTransform{
-					ToType: TransformIOTypeInt,
-					Format: &[]ConvertTransformFormat{"wrong"}[0],
-				},
-				from: TransformIOTypeInt,
-			},
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			_, err := tc.args.ct.GetConversionFunc(tc.args.from)
-			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("%s\nGetConversionFunc(...): -want, +got:\n%s", tc.reason, diff)
-			}
-		})
-	}
-}
-
-func TestTransform_GetOutputType(t *testing.T) {
+func TestTransformGetOutputType(t *testing.T) {
 	type args struct {
 		transform *Transform
 	}

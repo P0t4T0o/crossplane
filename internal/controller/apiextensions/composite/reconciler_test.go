@@ -202,6 +202,25 @@ func TestReconcile(t *testing.T) {
 				r: reconcile.Result{Requeue: true},
 			},
 		},
+		"SelectCompositionUpdatePolicyError": {
+			reason: "We should return any error encountered while selecting a composition update policy.",
+			args: args{
+				mgr: &fake.Manager{},
+				opts: []ReconcilerOption{
+					WithClient(&test.MockClient{
+						MockGet: test.NewMockGetFn(nil),
+						MockStatusUpdate: WantComposite(t, NewComposite(func(cr resource.Composite) {
+							cr.SetConditions(xpv1.ReconcileError(errors.Wrap(errBoom, errSelectCompUpdatePolicy)))
+						})),
+					}),
+					WithCompositeFinalizer(resource.NewNopFinalizer()),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return errBoom })),
+				},
+			},
+			want: want{
+				r: reconcile.Result{Requeue: true},
+			},
+		},
 		"SelectCompositionError": {
 			reason: "We should return any error encountered while selecting a composition.",
 			args: args{
@@ -217,6 +236,7 @@ func TestReconcile(t *testing.T) {
 					WithCompositionSelector(CompositionSelectorFn(func(_ context.Context, _ resource.Composite) error {
 						return errBoom
 					})),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -240,9 +260,10 @@ func TestReconcile(t *testing.T) {
 						cr.SetCompositionReference(&corev1.ObjectReference{})
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
 						return nil, errBoom
 					})),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -266,12 +287,15 @@ func TestReconcile(t *testing.T) {
 						cr.SetCompositionReference(&corev1.ObjectReference{})
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
-						return &v1.Composition{}, nil
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
+						return &v1.CompositionRevision{}, nil
 					})),
-					WithCompositionValidator(func(_ *v1.Composition) error {
+					WithCompositionRevisionValidator(CompositionRevisionValidatorFn(func(_ *v1.CompositionRevision) error {
 						return errBoom
-					}),
+					})),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error {
+						return nil
+					})),
 				},
 			},
 			want: want{
@@ -295,13 +319,14 @@ func TestReconcile(t *testing.T) {
 						cr.SetCompositionReference(&corev1.ObjectReference{})
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
-						return &v1.Composition{}, nil
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
+						return &v1.CompositionRevision{}, nil
 					})),
-					WithCompositionValidator(func(_ *v1.Composition) error { return nil }),
-					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.Composition) error {
+					WithCompositionRevisionValidator(CompositionRevisionValidatorFn(func(_ *v1.CompositionRevision) error { return nil })),
+					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.CompositionRevision) error {
 						return errBoom
 					})),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -321,15 +346,16 @@ func TestReconcile(t *testing.T) {
 					WithCompositionSelector(CompositionSelectorFn(func(_ context.Context, cr resource.Composite) error {
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
-						c := &v1.Composition{Spec: v1.CompositionSpec{}}
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
+						c := &v1.CompositionRevision{Spec: v1.CompositionRevisionSpec{}}
 						return c, nil
 					})),
-					WithCompositionValidator(func(_ *v1.Composition) error { return nil }),
-					WithConfigurator(ConfiguratorFn(func(ctx context.Context, cr resource.Composite, cp *v1.Composition) error { return nil })),
-					WithEnvironmentSelector(EnvironmentSelectorFn(func(ctx context.Context, cr resource.Composite, cp *v1.Composition) error {
+					WithCompositionRevisionValidator(CompositionRevisionValidatorFn(func(_ *v1.CompositionRevision) error { return nil })),
+					WithConfigurator(ConfiguratorFn(func(ctx context.Context, cr resource.Composite, rev *v1.CompositionRevision) error { return nil })),
+					WithEnvironmentSelector(EnvironmentSelectorFn(func(ctx context.Context, cr resource.Composite, rev *v1.CompositionRevision) error {
 						return errBoom
 					})),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -349,15 +375,16 @@ func TestReconcile(t *testing.T) {
 					WithCompositionSelector(CompositionSelectorFn(func(_ context.Context, cr resource.Composite) error {
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
-						c := &v1.Composition{Spec: v1.CompositionSpec{}}
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
+						c := &v1.CompositionRevision{Spec: v1.CompositionRevisionSpec{}}
 						return c, nil
 					})),
-					WithCompositionValidator(func(_ *v1.Composition) error { return nil }),
-					WithConfigurator(ConfiguratorFn(func(ctx context.Context, cr resource.Composite, cp *v1.Composition) error { return nil })),
+					WithCompositionRevisionValidator(CompositionRevisionValidatorFn(func(_ *v1.CompositionRevision) error { return nil })),
+					WithConfigurator(ConfiguratorFn(func(ctx context.Context, cr resource.Composite, rev *v1.CompositionRevision) error { return nil })),
 					WithEnvironmentFetcher(EnvironmentFetcherFn(func(ctx context.Context, cr resource.Composite) (*env.Environment, error) {
 						return nil, errBoom
 					})),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -381,16 +408,17 @@ func TestReconcile(t *testing.T) {
 						cr.SetCompositionReference(&corev1.ObjectReference{})
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
-						return &v1.Composition{}, nil
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
+						return &v1.CompositionRevision{}, nil
 					})),
-					WithCompositionValidator(func(_ *v1.Composition) error { return nil }),
-					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.Composition) error {
+					WithCompositionRevisionValidator(CompositionRevisionValidatorFn(func(_ *v1.CompositionRevision) error { return nil })),
+					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.CompositionRevision) error {
 						return nil
 					})),
 					WithComposer(ComposerFn(func(ctx context.Context, xr resource.Composite, req CompositionRequest) (CompositionResult, error) {
 						return CompositionResult{}, errBoom
 					})),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -414,11 +442,11 @@ func TestReconcile(t *testing.T) {
 						cr.SetCompositionReference(&corev1.ObjectReference{})
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
-						return &v1.Composition{}, nil
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
+						return &v1.CompositionRevision{}, nil
 					})),
-					WithCompositionValidator(func(_ *v1.Composition) error { return nil }),
-					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.Composition) error {
+					WithCompositionRevisionValidator(CompositionRevisionValidatorFn(func(_ *v1.CompositionRevision) error { return nil })),
+					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.CompositionRevision) error {
 						return nil
 					})),
 					WithComposer(ComposerFn(func(ctx context.Context, xr resource.Composite, req CompositionRequest) (CompositionResult, error) {
@@ -429,6 +457,7 @@ func TestReconcile(t *testing.T) {
 							return false, errBoom
 						},
 					}),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -452,14 +481,14 @@ func TestReconcile(t *testing.T) {
 						cr.SetCompositionReference(&corev1.ObjectReference{})
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
-						c := &v1.Composition{Spec: v1.CompositionSpec{
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
+						c := &v1.CompositionRevision{Spec: v1.CompositionRevisionSpec{
 							Resources: []v1.ComposedTemplate{{}},
 						}}
 						return c, nil
 					})),
-					WithCompositionValidator(func(_ *v1.Composition) error { return nil }),
-					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.Composition) error {
+					WithCompositionRevisionValidator(CompositionRevisionValidatorFn(func(_ *v1.CompositionRevision) error { return nil })),
+					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.CompositionRevision) error {
 						return nil
 					})),
 					WithComposer(ComposerFn(func(ctx context.Context, xr resource.Composite, req CompositionRequest) (CompositionResult, error) {
@@ -472,6 +501,7 @@ func TestReconcile(t *testing.T) {
 							return false, nil
 						},
 					}),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -495,14 +525,14 @@ func TestReconcile(t *testing.T) {
 						cr.SetCompositionReference(&corev1.ObjectReference{})
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
-						c := &v1.Composition{Spec: v1.CompositionSpec{
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
+						c := &v1.CompositionRevision{Spec: v1.CompositionRevisionSpec{
 							Resources: []v1.ComposedTemplate{{}},
 						}}
 						return c, nil
 					})),
-					WithCompositionValidator(func(_ *v1.Composition) error { return nil }),
-					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.Composition) error {
+					WithCompositionRevisionValidator(CompositionRevisionValidatorFn(func(_ *v1.CompositionRevision) error { return nil })),
+					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.CompositionRevision) error {
 						return nil
 					})),
 					WithComposer(ComposerFn(func(ctx context.Context, xr resource.Composite, req CompositionRequest) (CompositionResult, error) {
@@ -517,6 +547,7 @@ func TestReconcile(t *testing.T) {
 							return false, nil
 						},
 					}),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -541,14 +572,14 @@ func TestReconcile(t *testing.T) {
 						cr.SetCompositionReference(&corev1.ObjectReference{})
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
-						c := &v1.Composition{Spec: v1.CompositionSpec{
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
+						c := &v1.CompositionRevision{Spec: v1.CompositionRevisionSpec{
 							Resources: []v1.ComposedTemplate{{}},
 						}}
 						return c, nil
 					})),
-					WithCompositionValidator(func(_ *v1.Composition) error { return nil }),
-					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.Composition) error {
+					WithCompositionRevisionValidator(CompositionRevisionValidatorFn(func(_ *v1.CompositionRevision) error { return nil })),
+					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.CompositionRevision) error {
 						return nil
 					})),
 					WithComposer(ComposerFn(func(ctx context.Context, xr resource.Composite, req CompositionRequest) (CompositionResult, error) {
@@ -563,6 +594,7 @@ func TestReconcile(t *testing.T) {
 							return true, nil
 						},
 					}),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -628,14 +660,14 @@ func TestReconcile(t *testing.T) {
 						cr.SetCompositionReference(&corev1.ObjectReference{})
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
-						c := &v1.Composition{Spec: v1.CompositionSpec{
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
+						c := &v1.CompositionRevision{Spec: v1.CompositionRevisionSpec{
 							Resources: []v1.ComposedTemplate{{}},
 						}}
 						return c, nil
 					})),
-					WithCompositionValidator(func(_ *v1.Composition) error { return nil }),
-					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.Composition) error {
+					WithCompositionRevisionValidator(CompositionRevisionValidatorFn(func(_ *v1.CompositionRevision) error { return nil })),
+					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.CompositionRevision) error {
 						return nil
 					})),
 					WithComposer(ComposerFn(func(ctx context.Context, xr resource.Composite, req CompositionRequest) (CompositionResult, error) {
@@ -646,6 +678,7 @@ func TestReconcile(t *testing.T) {
 							return true, nil
 						},
 					}),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -674,14 +707,14 @@ func TestReconcile(t *testing.T) {
 						cr.SetCompositionReference(&corev1.ObjectReference{})
 						return nil
 					})),
-					WithCompositionFetcher(CompositionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.Composition, error) {
-						c := &v1.Composition{Spec: v1.CompositionSpec{
+					WithCompositionRevisionFetcher(CompositionRevisionFetcherFn(func(_ context.Context, _ resource.Composite) (*v1.CompositionRevision, error) {
+						c := &v1.CompositionRevision{Spec: v1.CompositionRevisionSpec{
 							Resources: []v1.ComposedTemplate{{}},
 						}}
 						return c, nil
 					})),
-					WithCompositionValidator(func(_ *v1.Composition) error { return nil }),
-					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.Composition) error {
+					WithCompositionRevisionValidator(CompositionRevisionValidatorFn(func(_ *v1.CompositionRevision) error { return nil })),
+					WithConfigurator(ConfiguratorFn(func(_ context.Context, _ resource.Composite, _ *v1.CompositionRevision) error {
 						return nil
 					})),
 					WithComposer(ComposerFn(func(ctx context.Context, xr resource.Composite, req CompositionRequest) (CompositionResult, error) {
@@ -692,6 +725,7 @@ func TestReconcile(t *testing.T) {
 							return true, nil
 						},
 					}),
+					WithCompositionUpdatePolicySelector(CompositionUpdatePolicySelectorFn(func(ctx context.Context, cr resource.Composite) error { return nil })),
 				},
 			},
 			want: want{
@@ -741,7 +775,13 @@ func WantComposite(t *testing.T, want resource.Composite) func(ctx context.Conte
 		// Normally we use a custom Equal method on conditions to ignore the
 		// lastTransitionTime, but we may be using unstructured types here where
 		// the conditions are just a map[string]any.
-		diff := cmp.Diff(want, got, cmpopts.EquateApproxTime(3*time.Second))
+		diff := cmp.Diff(want, got, cmpopts.AcyclicTransformer("StringToTime", func(s string) any {
+			ts, err := time.Parse(time.RFC3339, s)
+			if err != nil {
+				return s
+			}
+			return ts
+		}), cmpopts.EquateApproxTime(3*time.Second))
 		if diff != "" {
 			t.Errorf("WantComposite(...): -want, +got: %s", diff)
 		}
