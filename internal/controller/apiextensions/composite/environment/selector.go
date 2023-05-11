@@ -84,15 +84,15 @@ func isNoOp(ec *v1.EnvironmentConfiguration, currentRefs []corev1.ObjectReferenc
 
 // SelectEnvironment for cr using the configuration defined in comp.
 // The computed list of EnvironmentConfig references will be stored in cr.
-func (s *APIEnvironmentSelector) SelectEnvironment(ctx context.Context, cr resource.Composite, comp *v1.CompositionRevision) error {
+func (s *APIEnvironmentSelector) SelectEnvironment(ctx context.Context, cr resource.Composite, rev *v1.CompositionRevision) error {
 
-	if isNoOp(comp.Spec.Environment, cr.GetEnvironmentConfigReferences()) {
+	if isNoOp(rev.Spec.Environment, cr.GetEnvironmentConfigReferences()) {
 		return nil
 	}
 
-	refs := make([]corev1.ObjectReference, len(comp.Spec.Environment.EnvironmentConfigs))
+	refs := make([]corev1.ObjectReference, len(rev.Spec.Environment.EnvironmentConfigs))
 	idx := 0
-	for i, src := range comp.Spec.Environment.EnvironmentConfigs {
+	for i, src := range rev.Spec.Environment.EnvironmentConfigs {
 		switch src.Type {
 		case v1.EnvironmentSourceTypeReference:
 			refs = append(

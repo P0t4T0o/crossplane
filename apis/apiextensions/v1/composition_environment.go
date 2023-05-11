@@ -16,6 +16,10 @@ limitations under the License.
 
 package v1
 
+import (
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+)
+
 // An EnvironmentConfiguration specifies the environment for rendering composed
 // resources.
 type EnvironmentConfiguration struct {
@@ -37,27 +41,20 @@ type EnvironmentConfiguration struct {
 	// composition's resources are composed.
 	Patches []EnvironmentPatch `json:"patches,omitempty"`
 
-	// Policies for referencing.
+	// Policy represents the Resolve and Resolution policies which apply to
+	// all EnvironmentSourceReferences in EnvironmentConfigs list
 	// +optional
-	Policy *Policy `json:"policy,omitempty"`
+	Policy *xpv1.Policy `json:"policy,omitempty"`
 }
 
 // EnvironmentSourceType specifies the way the EnvironmentConfig is selected.
 type EnvironmentSourceType string
-
-// ResolvePolicy is a type for resolve policy.
-type ResolvePolicy string
 
 const (
 	// EnvironmentSourceTypeReference by name.
 	EnvironmentSourceTypeReference EnvironmentSourceType = "Reference"
 	// EnvironmentSourceTypeSelector by labels.
 	EnvironmentSourceTypeSelector EnvironmentSourceType = "Selector"
-
-	// ResolvePolicyAlways is a resolve option.
-	// When the ResolvePolicy is set to ResolvePolicyAlways the reference will
-	// be tried to resolve for every reconcile loop.
-	ResolvePolicyAlways ResolvePolicy = "Always"
 )
 
 // EnvironmentSource selects a EnvironmentConfig resource.
@@ -89,26 +86,6 @@ type EnvironmentSourceReference struct {
 type EnvironmentSourceSelector struct {
 	// MatchLabels ensures an object with matching labels is selected.
 	MatchLabels []EnvironmentSourceSelectorLabelMatcher `json:"matchLabels,omitempty"`
-}
-
-// Policy represents policies of EnvironmentSourceReference instance.
-type Policy struct {
-	// Resolve specifies when this reference should be resolved. The default
-	// is 'IfNotPresent', which will attempt to resolve the reference only when
-	// the corresponding field is not present. Use 'Always' to resolve the
-	// reference on every reconcile.
-	// +optional
-	// +kubebuilder:default=IfNotPresent
-	// +kubebuilder:validation:Enum=Always;IfNotPresent
-	Resolve *ResolvePolicy `json:"resolve,omitempty"`
-}
-
-// IsResolvePolicyAlways checks whether the resolution policy of relevant reference is Always.
-func (p *Policy) IsResolvePolicyAlways() bool {
-	if p == nil || p.Resolve == nil {
-		return false
-	}
-	return *p.Resolve == ResolvePolicyAlways
 }
 
 // EnvironmentSourceSelectorLabelMatcherType specifies where the value for a

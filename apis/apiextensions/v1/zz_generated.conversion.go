@@ -3,9 +3,9 @@
 package v1
 
 import (
-	v13 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	v12 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	v1 "k8s.io/api/core/v1"
-	v12 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	v13 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	v11 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"time"
@@ -274,7 +274,7 @@ func (c *GeneratedRevisionSpecConverter) v1EnvironmentConfigurationToV1Environme
 		v1EnvironmentPatchList[j] = c.v1EnvironmentPatchToV1EnvironmentPatch(source.Patches[j])
 	}
 	v1EnvironmentConfiguration.Patches = v1EnvironmentPatchList
-	var pV1Policy *Policy
+	var pV1Policy *v12.Policy
 	if source.Policy != nil {
 		v1Policy := c.v1PolicyToV1Policy(*source.Policy)
 		pV1Policy = &v1Policy
@@ -383,8 +383,8 @@ func (c *GeneratedRevisionSpecConverter) v1FunctionToV1Function(source Function)
 	v1Function.Container = pV1ContainerFunction
 	return v1Function
 }
-func (c *GeneratedRevisionSpecConverter) v1JSONToV1JSON(source v12.JSON) v12.JSON {
-	var v1JSON v12.JSON
+func (c *GeneratedRevisionSpecConverter) v1JSONToV1JSON(source v13.JSON) v13.JSON {
+	var v1JSON v13.JSON
 	byteList := make([]uint8, len(source.Raw))
 	for i := 0; i < len(source.Raw); i++ {
 		byteList[i] = source.Raw[i]
@@ -399,7 +399,7 @@ func (c *GeneratedRevisionSpecConverter) v1LocalObjectReferenceToV1LocalObjectRe
 }
 func (c *GeneratedRevisionSpecConverter) v1MapTransformToV1MapTransform(source MapTransform) MapTransform {
 	var v1MapTransform MapTransform
-	mapStringV1JSON := make(map[string]v12.JSON, len(source.Pairs))
+	mapStringV1JSON := make(map[string]v13.JSON, len(source.Pairs))
 	for key, value := range source.Pairs {
 		mapStringV1JSON[key] = c.v1JSONToV1JSON(value)
 	}
@@ -458,8 +458,8 @@ func (c *GeneratedRevisionSpecConverter) v1MathTransformToV1MathTransform(source
 	v1MathTransform.ClampMax = pInt643
 	return v1MathTransform
 }
-func (c *GeneratedRevisionSpecConverter) v1MergeOptionsToV1MergeOptions(source v13.MergeOptions) v13.MergeOptions {
-	var v1MergeOptions v13.MergeOptions
+func (c *GeneratedRevisionSpecConverter) v1MergeOptionsToV1MergeOptions(source v12.MergeOptions) v12.MergeOptions {
+	var v1MergeOptions v12.MergeOptions
 	var pBool *bool
 	if source.KeepMapValues != nil {
 		xbool := *source.KeepMapValues
@@ -482,7 +482,7 @@ func (c *GeneratedRevisionSpecConverter) v1PatchPolicyToV1PatchPolicy(source Pat
 		pV1FromFieldPathPolicy = &v1FromFieldPathPolicy
 	}
 	v1PatchPolicy.FromFieldPath = pV1FromFieldPathPolicy
-	var pV1MergeOptions *v13.MergeOptions
+	var pV1MergeOptions *v12.MergeOptions
 	if source.MergeOptions != nil {
 		v1MergeOptions := c.v1MergeOptionsToV1MergeOptions(*source.MergeOptions)
 		pV1MergeOptions = &v1MergeOptions
@@ -540,14 +540,20 @@ func (c *GeneratedRevisionSpecConverter) v1PatchToV1Patch(source Patch) Patch {
 	v1Patch.Policy = pV1PatchPolicy
 	return v1Patch
 }
-func (c *GeneratedRevisionSpecConverter) v1PolicyToV1Policy(source Policy) Policy {
-	var v1Policy Policy
-	var pV1ResolvePolicy *ResolvePolicy
+func (c *GeneratedRevisionSpecConverter) v1PolicyToV1Policy(source v12.Policy) v12.Policy {
+	var v1Policy v12.Policy
+	var pV1ResolvePolicy *v12.ResolvePolicy
 	if source.Resolve != nil {
-		v1ResolvePolicy := ResolvePolicy(*source.Resolve)
+		v1ResolvePolicy := v12.ResolvePolicy(*source.Resolve)
 		pV1ResolvePolicy = &v1ResolvePolicy
 	}
 	v1Policy.Resolve = pV1ResolvePolicy
+	var pV1ResolutionPolicy *v12.ResolutionPolicy
+	if source.Resolution != nil {
+		v1ResolutionPolicy := v12.ResolutionPolicy(*source.Resolution)
+		pV1ResolutionPolicy = &v1ResolutionPolicy
+	}
+	v1Policy.Resolution = pV1ResolutionPolicy
 	return v1Policy
 }
 func (c *GeneratedRevisionSpecConverter) v1ReadinessCheckToV1ReadinessCheck(source ReadinessCheck) ReadinessCheck {

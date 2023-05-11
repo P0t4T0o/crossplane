@@ -29,6 +29,7 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
+	v1 "github.com/crossplane/crossplane/apis/apiextensions/v1"
 	v1alpha1 "github.com/crossplane/crossplane/apis/apiextensions/v1alpha1"
 )
 
@@ -50,7 +51,7 @@ func NewNilEnvironmentFetcher() *NilEnvironmentFetcher {
 type NilEnvironmentFetcher struct{}
 
 // Fetch always returns nil.
-func (f *NilEnvironmentFetcher) Fetch(_ context.Context, _ resource.Composite) (*Environment, error) {
+func (f *NilEnvironmentFetcher) Fetch(_ context.Context, _ resource.Composite, _ *v1.CompositionRevision) (*Environment, error) {
 	return nil, nil
 }
 
@@ -77,7 +78,7 @@ type APIEnvironmentFetcher struct {
 //
 // Note: The `.Data` path is trimmed from the result so its necessary to include
 // it in patches.
-func (f *APIEnvironmentFetcher) Fetch(ctx context.Context, cr resource.Composite) (*Environment, error) {
+func (f *APIEnvironmentFetcher) Fetch(ctx context.Context, cr resource.Composite, rev *v1.CompositionRevision) (*Environment, error) {
 	var env *Environment
 
 	// Return an empty environment if the XR references no EnvironmentConfigs.
@@ -89,7 +90,13 @@ func (f *APIEnvironmentFetcher) Fetch(ctx context.Context, cr resource.Composite
 		}
 	} else {
 		var err error
-		env, err = f.fetchEnvironment(ctx, cr)
+		var isOptional bool
+
+		if rev != nil && rev.Spec.Environment != nil && rev.Spec.Environment.Policy != nil {
+			isOptional = rev.Spec.Environment.Policy.IsResolutionPolicyOptional()
+		}
+
+		env, err = f.fetchEnvironment(ctx, cr, isOptional)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +111,7 @@ func (f *APIEnvironmentFetcher) Fetch(ctx context.Context, cr resource.Composite
 	return env, nil
 }
 
-func (f *APIEnvironmentFetcher) fetchEnvironment(ctx context.Context, cr resource.Composite) (*Environment, error) {
+func (f *APIEnvironmentFetcher) fetchEnvironment(ctx context.Context, cr resource.Composite, isOptional bool) (*Environment, error) {
 	refs := cr.GetEnvironmentConfigReferences()
 	loadedConfigs := []v1alpha1.EnvironmentConfig{}
 	for _, ref := range refs {
@@ -112,8 +119,13 @@ func (f *APIEnvironmentFetcher) fetchEnvironment(ctx context.Context, cr resourc
 		nn := types.NamespacedName{
 			Name: ref.Name,
 		}
-		if err := f.kube.Get(ctx, nn, &config); err != nil {
-			return nil, errors.Wrap(err, errGetEnvironmentConfig)
+		err := f.kube.Get(ctx, nn, &config)
+		if err != nil {
+			// skip if resolution policy is optional
+			if !isOptional {
+				return nil, errors.Wrap(err, errGetEnvironmentConfig)
+			}
+			continue
 		}
 		loadedConfigs = append(loadedConfigs, config)
 	}
