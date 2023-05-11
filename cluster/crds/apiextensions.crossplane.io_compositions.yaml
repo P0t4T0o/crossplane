@@ -449,7 +449,7 @@ spec:
                   policy:
                     description: Policy represents the Resolve and Resolution policies
                       which apply to all EnvironmentSourceReferences in EnvironmentConfigs
-                      list
+                      list.
                     properties:
                       resolution:
                         default: Required

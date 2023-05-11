@@ -44,7 +44,7 @@ type EnvironmentConfiguration struct {
 	Patches []EnvironmentPatch `json:"patches,omitempty"`
 
 	// Policy represents the Resolve and Resolution policies which apply to
-	// all EnvironmentSourceReferences in EnvironmentConfigs list
+	// all EnvironmentSourceReferences in EnvironmentConfigs list.
 	// +optional
 	Policy *xpv1.Policy `json:"policy,omitempty"`
 }
