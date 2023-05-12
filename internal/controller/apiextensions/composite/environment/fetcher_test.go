@@ -81,6 +81,7 @@ func TestFetch(t *testing.T) {
 		return env
 	}
 
+	weight1 := "3"
 	testData1 := map[string]interface{}{
 		"int":  int(1),
 		"bool": true,
@@ -96,6 +97,7 @@ func TestFetch(t *testing.T) {
 		},
 	}
 
+	weight2 := "-1"
 	testData2 := map[string]interface{}{
 		"int": int(2),
 		"array": []int{
@@ -103,22 +105,61 @@ func TestFetch(t *testing.T) {
 		},
 		"test": map[string]interface{}{
 			"foo":   "bar2",
-			"hello": "world",
+			"hello": "world2",
 		},
 	}
 
-	testDataMerged := map[string]interface{}{
-		"int":  int(2),
+	weight3 := "4"
+	testData3 := map[string]interface{}{
+		"int":  int(3),
 		"bool": true,
 		"str":  "some str",
+		"array": []int{
+			1, 2, 3, 4,
+		},
+		"test": map[string]interface{}{
+			"foo": "bar3",
+			"complex": map[string]interface{}{
+				"data": "val3",
+			},
+		},
+	}
+
+	weight4 := "2"
+	testData4 := map[string]interface{}{
+		"int": int(2),
 		"array": []int{
 			1, 2, 3, 4, 5,
 		},
 		"test": map[string]interface{}{
-			"foo":   "bar2",
-			"hello": "world",
+			"foo":   "bar4",
+			"hello": "world4",
+		},
+	}
+
+	testData5 := map[string]interface{}{
+		"int": int(2),
+		"array": []int{
+			1, 2, 3, 4, 5,
+		},
+		"test": map[string]interface{}{
+			"foo":   "bar5",
+			"hello": "world5",
+		},
+	}
+
+	testDataMerged := map[string]interface{}{
+		"int":  int(3),
+		"bool": true,
+		"str":  "some str",
+		"array": []int{
+			1, 2, 3, 4,
+		},
+		"test": map[string]interface{}{
+			"foo":   "bar3",
+			"hello": "world4",
 			"complex": map[string]interface{}{
-				"data": "val",
+				"data": "val3",
 			},
 		},
 	}
@@ -179,19 +220,31 @@ func TestFetch(t *testing.T) {
 						cs := o.(*v1alpha1.EnvironmentConfig)
 						switch key.Name {
 						case "a":
+							cs.SetAnnotations(map[string]string{AnnotEnvConfigWeight: weight1})
 							cs.Data = makeJSON(testData1)
 						case "b":
+							cs.SetAnnotations(map[string]string{AnnotEnvConfigWeight: weight2})
 							cs.Data = makeJSON(testData2)
+						case "c":
+							cs.SetAnnotations(map[string]string{AnnotEnvConfigWeight: weight3})
+							cs.Data = makeJSON(testData3)
+						case "d":
+							cs.SetAnnotations(map[string]string{AnnotEnvConfigWeight: weight4})
+							cs.Data = makeJSON(testData4)
+						case "e":
+							cs.Data = makeJSON(testData5)
 						}
+
 						return nil
 					},
 				},
-				cr: composite(
-					withEnvironmentRefs(
-						corev1.ObjectReference{Name: "a"},
-						corev1.ObjectReference{Name: "b"},
-					),
-				),
+				cr: composite(withEnvironmentRefs(
+					corev1.ObjectReference{Name: "a"},
+					corev1.ObjectReference{Name: "b"},
+					corev1.ObjectReference{Name: "c"},
+					corev1.ObjectReference{Name: "d"},
+					corev1.ObjectReference{Name: "e"},
+				)),
 			},
 			want: want{
 				env: makeEnvironment(testDataMerged),

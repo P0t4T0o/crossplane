@@ -19,6 +19,8 @@ package environment
 import (
 	"context"
 	"encoding/json"
+	"sort"
+	"strconv"
 
 	"github.com/pkg/errors"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -36,6 +38,11 @@ import (
 const (
 	errGetEnvironmentConfig = "failed to get config set from reference"
 	errMergeData            = "failed to merge data"
+	errParseWeight          = "failed to parse weight of environment config"
+
+	// AnnotEnvConfigWeight defines order during config aggregation. EnvironmentConfigs with higher weight
+	// overwrite common fields of configs with lower weights
+	AnnotEnvConfigWeight = "environmentconfig.crossplane.io/weight"
 
 	environmentGroup   = "internal.crossplane.io"
 	environmentVersion = "v1alpha1"
@@ -111,11 +118,34 @@ func (f *APIEnvironmentFetcher) Fetch(ctx context.Context, cr resource.Composite
 	return env, nil
 }
 
+func getWeight(ec v1alpha1.EnvironmentConfig) (int, error) {
+
+	var w int
+	var err error
+
+	if ws, ok := ec.GetAnnotations()[AnnotEnvConfigWeight]; ok {
+		w, err = strconv.Atoi(ws)
+		if err != nil {
+			return -1, err
+		}
+
+	} else {
+		w = -1
+	}
+	return w, nil
+}
+
+type weightedConfigs struct {
+	ec v1alpha1.EnvironmentConfig
+	w  int
+}
+
 func (f *APIEnvironmentFetcher) fetchEnvironment(ctx context.Context, cr resource.Composite, isOptional bool) (*Environment, error) {
 	refs := cr.GetEnvironmentConfigReferences()
-	loadedConfigs := []v1alpha1.EnvironmentConfig{}
+	loadedConfigs := []weightedConfigs{}
 	for _, ref := range refs {
 		config := v1alpha1.EnvironmentConfig{}
+
 		nn := types.NamespacedName{
 			Name: ref.Name,
 		}
@@ -127,8 +157,23 @@ func (f *APIEnvironmentFetcher) fetchEnvironment(ctx context.Context, cr resourc
 			}
 			continue
 		}
-		loadedConfigs = append(loadedConfigs, config)
+
+		w, err := getWeight(config)
+
+		if err != nil {
+			return nil, errors.Wrap(err, errParseWeight)
+		}
+
+		loadedConfigs = append(loadedConfigs, weightedConfigs{
+			ec: config,
+			w:  w,
+		})
 	}
+
+	// lower weight config will be over written by higher weight config
+	sort.Slice(loadedConfigs, func(i, j int) bool {
+		return loadedConfigs[i].w < loadedConfigs[j].w
+	})
 
 	mergedData, err := mergeEnvironmentData(loadedConfigs)
 	if err != nil {
@@ -141,13 +186,13 @@ func (f *APIEnvironmentFetcher) fetchEnvironment(ctx context.Context, cr resourc
 	}, nil
 }
 
-func mergeEnvironmentData(configs []v1alpha1.EnvironmentConfig) (map[string]interface{}, error) {
+func mergeEnvironmentData(configs []weightedConfigs) (map[string]interface{}, error) {
 	merged := map[string]interface{}{}
 	for _, e := range configs {
-		if e.Data == nil {
+		if e.ec.Data == nil {
 			continue
 		}
-		data, err := unmarshalData(e.Data)
+		data, err := unmarshalData(e.ec.Data)
 		if err != nil {
 			return nil, err
 		}
