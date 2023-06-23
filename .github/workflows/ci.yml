@@ -11,7 +11,7 @@ on:
 env:
   # Common versions
   GO_VERSION: '1.20.5'
-  GOLANGCI_VERSION: 'v1.53.2'
+  GOLANGCI_VERSION: 'v1.53.3'
   DOCKER_BUILDX_VERSION: 'v0.10.0'
 
   # Common users. We can't run a step 'if secrets.AWS_USR != ""' but we can run
@@ -158,12 +158,12 @@ jobs:
         run: make vendor vendor.check
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@6c089f53dd51dc3fc7e599c3cb5356453a52ca9e # v2
+        uses: github/codeql-action/init@f6e388ebf0efc915c6c5b165b019ee61a6746a38 # v2
         with:
           languages: go
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@6c089f53dd51dc3fc7e599c3cb5356453a52ca9e # v2
+        uses: github/codeql-action/analyze@f6e388ebf0efc915c6c5b165b019ee61a6746a38 # v2
 
   trivy-scan-fs:
     runs-on: ubuntu-22.04
@@ -238,6 +238,9 @@ jobs:
     runs-on: ubuntu-22.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
+    strategy:
+      matrix:
+        area: [lifecycle, pkg, apiextensions]
 
     steps:
       - name: Setup QEMU
@@ -294,7 +297,7 @@ jobs:
           BUILD_ARGS: "--load"
 
       - name: Run E2E Tests
-        run: make e2e USE_HELM3=true
+        run: make e2e E2E_TEST_FLAGS="-test.v -labels area=${{ matrix.area }}"
 
   publish-artifacts:
     runs-on: ubuntu-22.04
